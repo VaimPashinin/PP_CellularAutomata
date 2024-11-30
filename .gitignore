@@ -34,3 +34,6 @@ x64
 PP_Cellu.e05b6910
 .vs
 tmp
+enc_temp_folder/95d74ee7c9cf50a85c4c387de49588e/Tests.cpp
+tests/*.bat
+tests/*.gpi

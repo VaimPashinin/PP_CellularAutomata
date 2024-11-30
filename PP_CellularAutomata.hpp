@@ -23,11 +23,15 @@ public:
 
     void Start();                                           // Запуск игры
 
-    void InitWorld(std::string file);                       // Инициализация поля
+    void StartTest(std::string filename);                                       // Запуск тестов
+
+    void InitWorld(std::string filename);                       // Инициализация поля
 
     int GetPopulationCount();                               // Подсчёт числа живых клеток
 
     void NextGen();                                         // Вычисление следующего поколения
+
+    void CheckStable(bool** nextField);               // Проверка стабилизации поля
 
     void Print();                                           // Вывод на экран
 };

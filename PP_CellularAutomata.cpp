@@ -1,12 +1,12 @@
 ﻿#include "PP_CellularAutomata.hpp"
 #include <iostream>
 #include <random>
+#include <fstream>
+#include <chrono>
 #include <locale.h>
 #include <windows.h>
 
 #include <omp.h>
-
-#define __THREADS__ 4
 
 void GameOfLife::FindNeighbors(signed int nb[][2], int x, int y)
 {
@@ -93,20 +93,37 @@ GameOfLife::~GameOfLife() {
 
 void GameOfLife::Start() {
     int population = GetPopulationCount();
-    while (population > 0 && !_is_stable) {
-        Print();
+    Print();
+    while (population > 0 && !_is_stable && _generation < 10000) {
         NextGen();
         population = GetPopulationCount();
         _generation++;
+        Print();
     }
     if (population == 0)
         std::cout << "Колония вымерла, игра закончена";
-    if (_is_stable)
-        std::cout << "Колония завершила своё развитие, игра закончена";
 }
 
-void GameOfLife::InitWorld(std::string file) {
-    if (file.empty()) {
+void GameOfLife::StartTest(std::string filename) {
+    int population = GetPopulationCount();
+    auto start = std::chrono::high_resolution_clock::now();
+    std::ofstream file;
+    file.open(filename);
+
+    while (population > 0 && !_is_stable && _generation < 10000) {
+        NextGen();
+        population = GetPopulationCount();
+        _generation++;
+        auto current = std::chrono::high_resolution_clock::now();
+        double time = (current - start).count();
+        file << _generation << " " << time << std::endl;
+    }
+
+    file.close();
+}
+
+void GameOfLife::InitWorld(std::string filename) {
+    if (filename.empty()) {
         std::random_device rd;
         std::mt19937 gen(rd());
         std::uniform_int_distribution<> dis(1, 10000);
@@ -122,6 +139,44 @@ void GameOfLife::InitWorld(std::string file) {
         }
 
         return;
+    }
+
+    else {
+        std::ifstream file;
+        file.open(filename);
+        bool is_empty = true;
+        if (file.is_open()) {
+            int x = 0;
+            int y = 0;
+            while (file >> x >> y) {
+                if (is_empty) is_empty = false;
+                _field[x][y] = true;
+            }
+        }
+        file.close();
+
+        if (is_empty) {
+            std::ofstream file;
+            file.open(filename);
+
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<> dis(1, 10000);
+
+            for (int i = 0; i < _columns; i++)
+            {
+                for (int j = 0; j < _rows; j++)
+                {
+                    int num = dis(gen);
+                    if (num % 2 == 0)
+                    {
+                        _field[i][j] = true;
+                        file << i << " " << j << "\n";
+                    }
+                }
+            }
+            file.close();
+        }
     }
 }
 
@@ -145,36 +200,31 @@ void GameOfLife::NextGen() {
     for (int i = 0; i < _columns; i++)
         nextField[i] = new bool[_rows];
     _is_stable = true;
-    omp_set_num_threads(__THREADS__);
 
-#pragma omp parallel
-    {
-#pragma omp for nowait
-        for (int i = 0; i < _columns; i++) {
-            for (int j = 0; j < _rows; j++) {
-                switch (this->GetNeighbors(i, j))
-                {
-                default: {
-                    nextField[i][j] = false;
-                    break;
-                }
-                case 2: {
-                    if (_field[i][j])
-                        nextField[i][j] = true;
-                    else nextField[i][j] = false;
-                    break;
-                }
-                case 3: {
+#pragma omp parallel for
+    for (int i = 0; i < _columns; i++) {
+        for (int j = 0; j < _rows; j++) {
+            switch (this->GetNeighbors(i, j))
+            {
+            default: {
+                nextField[i][j] = false;
+                break;
+            }
+            case 2: {
+                if (_field[i][j])
                     nextField[i][j] = true;
-                    break;
-                }
-                }
-                if (_is_stable)
-                    _is_stable &= _field[i][j] == nextField[i][j];
+                else nextField[i][j] = false;
+                break;
+            }
+            case 3: {
+                nextField[i][j] = true;
+                break;
+            }
             }
         }
     }
-            
+       
+    CheckStable(nextField);
 
     for (int i = 0; i < _columns; i++) {
         for (int j = 0; j < _rows; j++) {
@@ -183,6 +233,12 @@ void GameOfLife::NextGen() {
         delete nextField[i];
     }
     delete[] nextField;
+}
+
+void GameOfLife::CheckStable(bool** nextField) {
+    for (int i = 0; i < _columns; i++)
+        for (int j = 0; j < _rows; j++)
+            _is_stable &= _field[i][j] == nextField[i][j];
 }
 
 void GameOfLife::Print()
@@ -198,10 +254,10 @@ void GameOfLife::Print()
             }
             std::cout << ' ';
         }
-        std::cout << std::endl;
+        std::cout << '\n';
     }
 
-    std::cout << "Число живых клеток: " << GetPopulationCount() << std::endl;
-    std::cout << "Поколение " << _generation << std::endl;
+    std::cout << "Число живых клеток: " << GetPopulationCount() << '\n';
+    std::cout << "Поколение " << _generation;
 }
 
